@@ -1,0 +1,13 @@
+language: cpp
+sudo: required
+dist: trusty
+compiler:
+- gcc
+os:
+- linux
+before_install:
+- echo $LANG
+- echo $LC_ALL
+- sudo apt-get install libgmp-dev
+script:
+- make helib
