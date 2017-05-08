@@ -18,6 +18,6 @@ ntl: download-ntl
 download-ntl:
 	$(WGET) $(NTLURL)
 	$(TAR) xvfz $(NTLNAME).tar.gz
-
+	
 clean:
 	-rm -r $(NTLNAME) $(NTLNAME).tar.gz
