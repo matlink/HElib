@@ -1,22 +1,18 @@
-/* Copyright (C) 2012,2013 IBM Corp.
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+/* Copyright (C) 2012-2017 IBM Corp.
+ * This program is Licensed under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. See accompanying LICENSE file.
  */
-
+#include <NTL/BasicThreadPool.h>
+#include "timing.h"
 #include "Ctxt.h"
 #include "FHE.h"
-#include "timing.h"
 
 // A hack for recording required automorphisms (see NumbTh.h)
 std::set<long>* FHEglobals::automorphVals = NULL;
@@ -127,6 +123,7 @@ Ctxt::Ctxt(ZeroCtxtLike_type, const Ctxt& ctxt):
 // between different public keys.
 Ctxt& Ctxt::privateAssign(const Ctxt& other)
 {
+  FHE_TIMER_START;
   if (this == &other) return *this; // both point to the same object
 
   parts = other.parts;
@@ -588,6 +585,7 @@ void Ctxt::negate()
 // Add/subtract another ciphertxt (depending on the negative flag)
 void Ctxt::addCtxt(const Ctxt& other, bool negative)
 {
+  FHE_TIMER_START;
   // Sanity check: same context and public key
   assert (&context==&other.context && &pubKey==&other.pubKey);
 
@@ -743,6 +741,7 @@ Ctxt& Ctxt::operator*=(const Ctxt& other)
 
 void Ctxt::multiplyBy(const Ctxt& other)
 {
+  FHE_TIMER_START;
   // Special case: if *this is empty then do nothing
   if (this->isEmpty()) return;
 
@@ -752,6 +751,7 @@ void Ctxt::multiplyBy(const Ctxt& other)
 
 void Ctxt::multiplyBy2(const Ctxt& other1, const Ctxt& other2)
 {
+  FHE_TIMER_START;
   // Special case: if *this is empty then do nothing
   if (this->isEmpty()) return;
 
@@ -802,12 +802,13 @@ void Ctxt::multByConstant(const ZZ& c)
   FHE_TIMER_START;
 
   long cc = rem(c, ptxtSpace); // reduce modulo plaintext space
+  if (cc > ptxtSpace/2) cc -= ptxtSpace;
+  else if (cc < -ptxtSpace/2) cc += ptxtSpace;
   ZZ tmp = to_ZZ(cc);
 
   // multiply all the parts by this constant
   for (size_t i=0; i<parts.size(); i++) parts[i] *= tmp;
 
-  if (cc > ptxtSpace/2) cc -= ptxtSpace;
   double size = to_double(cc);
   noiseVar *= size*size * context.zMStar.get_cM();
 }
@@ -833,6 +834,14 @@ void Ctxt::multByConstant(const DoubleCRT& dcrt, double size)
 }
 
 void Ctxt::multByConstant(const ZZX& poly, double size)
+{
+  if (this->isEmpty()) return;
+  FHE_TIMER_START;
+  DoubleCRT dcrt(poly,context,primeSet);
+  multByConstant(dcrt,size);
+}
+
+void Ctxt::multByConstant(const zzX& poly, double size)
 {
   if (this->isEmpty()) return;
   FHE_TIMER_START;
@@ -985,7 +994,7 @@ const long Ctxt::getKeyID() const
   for (size_t i=0; i<parts.size(); i++)
     if (!parts[i].skHandle.isOne()) return parts[i].skHandle.getSecretKeyID();
 
-  return -1;
+  return 0; // no part pointing to anything, return the default key
 }
 
 // Estimates the added noise variance from mod-switching down
@@ -1078,7 +1087,7 @@ istream& operator>>(istream& str, Ctxt& ctxt)
 
 void CheckCtxt(const Ctxt& c, const char* label)
 {
-  cerr << "  "<<label << ", level=" << c.findBaseLevel() << ", log(noise/modulus)~" << c.log_of_ratio() << endl;
+  cerr << "  "<<label << ", level=" << c.findBaseLevel() << ", log(noise/modulus)~" << c.log_of_ratio() << ", p^r="<<c.getPtxtSpace()<<endl;
 }
 
 // The recursive incremental-product function that does the actual work
@@ -1097,7 +1106,14 @@ static void recursiveIncrementalProduct(Ctxt array[], long n)
   recursiveIncrementalProduct(&array[n1], n-n1);
 
   // Multiply the last product in the 1st part into every product in the 2nd
-  for (long i=n1; i<n; i++) array[i].multiplyBy(array[n1-1]);
+  if (n-n1 > 1) {
+    NTL_EXEC_RANGE(n-n1, first, last)
+    for (long i=n1+first; i<n1+last; i++)
+      array[i].multiplyBy(array[n1-1]);
+    NTL_EXEC_RANGE_END
+  }
+  else
+    for (long i=n1; i<n; i++) array[i].multiplyBy(array[n1-1]);
 }
 
 // For i=n-1...0, set v[i]=prod_{j<=i} v[j]

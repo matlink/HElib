@@ -1,17 +1,13 @@
-/* Copyright (C) 2012,2013 IBM Corp.
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+/* Copyright (C) 2012-2017 IBM Corp.
+ * This program is Licensed under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. See accompanying LICENSE file.
  */
 #ifndef _EncryptedArray_H_
 #define _EncryptedArray_H_
@@ -130,9 +126,14 @@ public:
   ///@{
   //! @name Encoding/decoding methods
   // encode/decode arrays into plaintext polynomials
+  virtual void encode(zzX& ptxt, const vector< long >& array) const = 0;
+  virtual void encode(zzX& ptxt, const vector< zzX >& array) const = 0;
+  virtual void encode(zzX& ptxt, const NewPlaintextArray& array) const = 0;
+
   virtual void encode(ZZX& ptxt, const vector< long >& array) const = 0;
   virtual void encode(ZZX& ptxt, const vector< ZZX >& array) const = 0;
   virtual void encode(ZZX& ptxt, const NewPlaintextArray& array) const = 0;
+
   virtual void decode(vector< long  >& array, const ZZX& ptxt) const = 0;
   virtual void decode(vector< ZZX  >& array, const ZZX& ptxt) const = 0;
   virtual void decode(NewPlaintextArray& array, const ZZX& ptxt) const = 0;
@@ -291,6 +292,7 @@ public:
   virtual EncryptedArrayBase* clone() const { return new EncryptedArrayDerived(*this); }
 
   virtual PA_tag getTag() const { return tag; }
+  // tag is defined in PA_INJECT, see PAlgebra.h
 
 // DIRT: we're using undocumented NTL interfaces here
 #define FHE_DEFINE_LOWER_DISPATCH(n)\
@@ -302,7 +304,6 @@ public:
 
 
   NTL_FOREACH_ARG(FHE_DEFINE_LOWER_DISPATCH)
-
 
   const RX& getG() const { return mappingData.getG(); }
 
@@ -329,17 +330,27 @@ public:
   virtual void rotate(Ctxt& ctxt, long k) const;
   virtual void shift(Ctxt& ctxt, long k) const;
   virtual void rotate1D(Ctxt& ctxt, long i, long k, bool dc=false) const;
+  template<class U> void // avoid this being "hidden" by other rotate1D's
+    rotate1D(vector<U>& out, const vector<U>& in, long i, long offset) const
+    { EncryptedArrayBase::rotate1D(out, in, i, offset); }
   virtual void shift1D(Ctxt& ctxt, long i, long k) const;
 
-
   virtual void encode(ZZX& ptxt, const vector< long >& array) const
+    { genericEncode(ptxt, array);  }
+
+  virtual void encode(zzX& ptxt, const vector< long >& array) const
     { genericEncode(ptxt, array);  }
 
   virtual void encode(ZZX& ptxt, const vector< ZZX >& array) const
     {  genericEncode(ptxt, array); }
 
-  virtual void encode(ZZX& ptxt, const NewPlaintextArray& array) const;
+  virtual void encode(zzX& ptxt, const vector< zzX >& array) const
+    {  genericEncode(ptxt, array); }
 
+  virtual void encode(ZZX& ptxt, const NewPlaintextArray& array) const;
+  virtual void encode(zzX& ptxt, const NewPlaintextArray& array) const;
+
+  virtual void encodeUnitSelector(zzX& ptxt, long i) const;
   virtual void encodeUnitSelector(ZZX& ptxt, long i) const;
 
   virtual void decode(vector< long  >& array, const ZZX& ptxt) const
@@ -349,6 +360,7 @@ public:
     { genericDecode(array, ptxt); }
 
   virtual void decode(NewPlaintextArray& array, const ZZX& ptxt) const;
+  virtual void decode(NewPlaintextArray& array, const zzX& ptxt) const;
 
   virtual void random(vector< long  >& array) const
     { genericRandom(array); } // choose at random and convert to vector<long>
@@ -414,6 +426,9 @@ public:
      the modulus context is already set
    */
 
+  void encode(zzX& ptxt, const vector< RX >& array) const;
+  void decode(vector< RX  >& array, const zzX& ptxt) const;
+
   void encode(ZZX& ptxt, const vector< RX >& array) const;
   void decode(vector< RX  >& array, const ZZX& ptxt) const;
 
@@ -442,6 +457,16 @@ private:
 
   template<class T> 
   void genericEncode(ZZX& ptxt, const T& array) const
+  {
+    RBak bak; bak.save(); tab.restoreContext();
+
+    vector< RX > array1;
+    convert(array1, array);
+    encode(ptxt, array1);
+  }
+
+  template<class T> 
+  void genericEncode(zzX& ptxt, const T& array) const
   {
     RBak bak; bak.save(); tab.restoreContext();
 
@@ -607,6 +632,13 @@ NTL_FOREACH_ARG(FHE_DEFINE_UPPER_DISPATCH)
   void encode(ZZX& ptxt, const vector< ZZX >& array) const 
     { rep->encode(ptxt, array); }
   void encode(ZZX& ptxt, const NewPlaintextArray& array) const 
+    { rep->encode(ptxt, array); }
+
+  void encode(zzX& ptxt, const vector< long >& array) const 
+    { rep->encode(ptxt, array); }
+  void encode(zzX& ptxt, const vector< zzX >& array) const 
+    { rep->encode(ptxt, array); }
+  void encode(zzX& ptxt, const NewPlaintextArray& array) const 
     { rep->encode(ptxt, array); }
 
   void encodeUnitSelector(ZZX& ptxt, long i) const

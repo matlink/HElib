@@ -1,17 +1,13 @@
-/* Copyright (C) 2012,2013 IBM Corp.
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+/* Copyright (C) 2012-2017 IBM Corp.
+ * This program is Licensed under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. See accompanying LICENSE file.
  */
 
 #include "FHE.h"
@@ -462,16 +458,21 @@ istream& operator>>(istream& str, FHEPubKey& pk)
   //  cerr << "FHEPubKey[";
   seekPastChar(str, '['); // defined in NumbTh.cpp
 
-  // sanity check, verify that basic ocntext parameters are correct
+  // sanity check, verify that basic context parameters are correct
   unsigned long m, p, r;
   vector<long> gens, ords;
   readContextBase(str, m, p, r, gens, ords);
-  assert( m == pk.getContext().zMStar.getM() );
-  assert( p == pk.getContext().zMStar.getP() );
-  assert( gens.size() == pk.getContext().zMStar.numOfGens() );
-  for (long i=0; i<(long)gens.size(); i++)
-    assert(gens[i]==(long)pk.getContext().zMStar.ZmStarGen(i) 
-	   && ords[i]==(long) pk.getContext().zMStar.OrderOf(i));
+  const PAlgebra& palg = pk.getContext().zMStar;
+  assert( m == palg.getM() );
+  assert( p == palg.getP() );
+  assert( gens.size() == palg.numOfGens() );
+  for (long i=0; i<(long)gens.size(); i++) {
+    assert(gens[i]==(long)palg.ZmStarGen(i));
+    if (palg.SameOrd(i))
+      assert(ords[i]==(long) pk.getContext().zMStar.OrderOf(i));
+    else
+      assert(-ords[i]==(long) pk.getContext().zMStar.OrderOf(i));
+  }
 
   // Get the public encryption key itself
   str >> pk.pubEncrKey;

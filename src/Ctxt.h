@@ -1,17 +1,13 @@
-/* Copyright (C) 2012,2013 IBM Corp.
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+/* Copyright (C) 2012-2017 IBM Corp.
+ * This program is Licensed under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License. See accompanying LICENSE file.
  */
 #ifndef _Ctxt_H_
 #define _Ctxt_H_
@@ -362,6 +358,7 @@ public:
   //! phi(m)*ptxtSpace^2 as the default value.
   void multByConstant(const DoubleCRT& dcrt, double size=-1.0);
   void multByConstant(const ZZX& poly, double size=-1.0);
+  void multByConstant(const zzX& poly, double size=-1.0);
   void multByConstant(const ZZ& c);
 
   //! Convenience method: XOR and nXOR with arbitrary plaintext space:
@@ -425,6 +422,13 @@ public:
   ///@{
   //! Reduce plaintext space to a divisor of the original plaintext space
   void reducePtxtSpace(long newPtxtSpace);
+
+  // This method can be used to increase the plaintext space, but the
+  // high-order digits that you get this way are noise. Do not use it
+  // unless you know what you are doing.
+  void hackPtxtSpace(long newPtxtSpace) { ptxtSpace=newPtxtSpace; }
+
+  void bumpNoiseEstimate(double factor) { noiseVar *= factor; }
 
   void reLinearize(long keyIdx=0);
           // key-switch to (1,s_i), s_i is the base key with index keyIdx
@@ -525,7 +529,8 @@ public:
 
   //! @brief Returns log(noise-variance)/2 - log(q)
   double log_of_ratio() const
-  {return (log(getNoiseVar())/2 - context.logOfProduct(getPrimeSet()));}
+  {return (getNoiseVar()==0.0)? (-context.logOfProduct(getPrimeSet()))
+      : ((log(getNoiseVar())/2 - context.logOfProduct(getPrimeSet())) );}
   ///@}
   friend istream& operator>>(istream& str, Ctxt& ctxt);
   friend ostream& operator<<(ostream& str, const Ctxt& ctxt);
@@ -582,16 +587,26 @@ void CheckCtxt(const Ctxt& c, const char* label);
  * nonzero. If that assumptions does not hold then the result will not be
  * a valid ciphertext anymore.
  *
- * If the shortCut flag is set then digits[j] contains the j'th digits
- * wrt mod-p plaintext space and the highest possible level (for all j).
- * Otherwise digits[j] still contains the j'th digit in the base-p expansion,
- * but wrt mod-p^{r-j} plaintext space, and all the ciphertexts are at the
- * same level.
+ * The "shortcut" flag is deprecated, it often leads to catastrophic failure
+ * in the noise estimate. Calling the function with shortcut=true has not
+ * effect, except printing a warning message to cerr.
+ *
+ * The output ciphertext digits[j] contains the j'th digit in the base-p
+ * expansion of the input, and its plaintext space is modulo p^{r-j}. All
+ * the ciphertexts in the output are at the same level.
  **/
-void extractDigits(vector<Ctxt>& digits, const Ctxt& c, long r=0, bool shortCut=false);
-  // implemented in extractDigits.cpp
+void extractDigits(vector<Ctxt>& digits, const Ctxt& c, long r=0);
+// implemented in extractDigits.cpp
+
+inline void
+extractDigits(vector<Ctxt>& digits, const Ctxt& c, long r, bool shortCut)
+{
+  if (shortCut)
+    std::cerr << "extractDigits: the shortCut flag is disabled\n";
+  extractDigits(digits, c, r);
+}
 
 inline void Ctxt::extractBits(vector<Ctxt>& bits, long nBits2extract)
-{ extractDigits(bits, *this, nBits2extract, true); }
+{ extractDigits(bits, *this, nBits2extract); }
 
 #endif // ifndef _Ctxt_H_
