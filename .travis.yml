@@ -10,4 +10,4 @@ before_install:
 - echo $LC_ALL
 - sudo apt-get install libgmp-dev
 script:
-- make helib
+- make -j4 helib
