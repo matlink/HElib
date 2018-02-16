@@ -1,4 +1,4 @@
-NTLNAME=ntl-10.3.0
+NTLNAME=ntl-10.5.0
 NTLURL=http://www.shoup.net/ntl/$(NTLNAME).tar.gz
 
 WGET=$(shell which wget)
