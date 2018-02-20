@@ -11,7 +11,7 @@ helib: ntl
 	$(MAKE) -C src
 
 ntl: download-ntl
-	cd $(NTLNAME)/src; ./configure DEF_PREFIX=$(HOME);
+	cd $(NTLNAME)/src; ./configure DEF_PREFIX=$(HOME) NTL_THREADS=on NTL_THREAD_BOOST=on NTL_EXCEPTIONS=on;
 	$(MAKE) -C $(NTLNAME)/src
 	$(MAKE) -C $(NTLNAME)/src install
 
