@@ -21,3 +21,7 @@ download-ntl:
 	
 clean:
 	-rm -r $(NTLNAME) $(NTLNAME).tar.gz
+
+test:
+	cd src; make howtohelib_x
+	./src/howtohelib_x

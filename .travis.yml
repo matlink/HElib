@@ -11,3 +11,4 @@ before_install:
 - sudo apt-get install libgmp-dev
 script:
 - make -j4 helib
+- make test
