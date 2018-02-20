@@ -7,7 +7,7 @@ SED=$(shell which sed)
 TAR=$(shell which tar)
 
 helib: ntl
-	$(SED) -i 's,\(^CFLAGS =.*\$\),\1 -I$$(HOME)/include,g' src/Makefile
+	$(SED) -i 's,\(^CFLAGS =.*\$\),\1 -L$(HOME)/lib -I$(HOME)/include,g' src/Makefile
 	$(MAKE) -C src
 
 ntl: download-ntl
